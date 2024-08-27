@@ -1,0 +1,1 @@
+A program has been written for the NPA700V pressure and temperature sensor, which is configured to read data every 1 ms, convert data into temperature and pressure, and send measured values ​​via a virtual COM port.
