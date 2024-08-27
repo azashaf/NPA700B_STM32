@@ -47,6 +47,23 @@ I2C_HandleTypeDef hi2c1;
 TIM_HandleTypeDef htim1;
 
 /* USER CODE BEGIN PV */
+typedef struct{
+       uint8_t Data[4];
+       uint8_t update_data;
+       uint16_t pressure_raw;
+       uint16_t temperature_raw;
+       uint32_t count_max;
+       uint32_t count_min;
+       float pressure_min; // pressure corresponding to output value 0 dec
+       float pressure_max;  // pressure corresponding to output value 16383 dec
+       float tcoeff;     // 2^11 see datasheet
+       float slope;
+       float pressure_calc;
+       float temperature_calc;
+       char msg[50];
+}NPA;
+
+NPA NPA700B;
 
 /* USER CODE END PV */
 

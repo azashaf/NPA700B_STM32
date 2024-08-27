@@ -17,6 +17,7 @@
 "presse\stm32f1xx_hal_flash.o"
 "presse\stm32f1xx_hal_flash_ex.o"
 "presse\stm32f1xx_hal_exti.o"
+"presse\stm32f1xx_hal_i2c.o"
 "presse\stm32f1xx_hal_tim.o"
 "presse\stm32f1xx_hal_tim_ex.o"
 "presse\system_stm32f1xx.o"
