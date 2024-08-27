@@ -47,6 +47,23 @@ I2C_HandleTypeDef hi2c1;
 TIM_HandleTypeDef htim1;
 
 /* USER CODE BEGIN PV */
+typedef struct{
+	uint8_t Data[4];
+	uint8_t update_data;
+	uint16_t pressure_raw;
+	uint16_t temperature_raw;
+	uint32_t count_max;
+	uint32_t count_min;
+	float pressure_min; // pressure corresponding to output value 0 dec
+	float pressure_max;  // pressure corresponding to output value 16383 dec
+	float tcoeff;     // 2^11 see datasheet 
+	float slope;
+	float pressure_calc;
+	float temperature_calc;
+	char msg[50]; 
+}NPA;
+
+NPA NPA700B;
 
 /* USER CODE END PV */
 
@@ -56,7 +73,10 @@ static void MX_GPIO_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_TIM1_Init(void);
 /* USER CODE BEGIN PFP */
-
+void init_npa(NPA *npa);
+float measurement_pressure(NPA *npa);
+float measurement_temperature(NPA *npa);
+void send(NPA *npa);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -95,8 +115,10 @@ int main(void)
   MX_USB_DEVICE_Init();
   MX_I2C1_Init();
   MX_TIM1_Init();
+	init_npa(&NPA700B);
   /* USER CODE BEGIN 2 */
-
+	__HAL_TIM_CLEAR_FLAG(&htim1, TIM_SR_UIF); // очищаем флаг	
+	HAL_TIM_Base_Start_IT(&htim1);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -106,6 +128,13 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+		if (NPA700B.update_data != 0)
+		{
+			measurement_pressure(&NPA700B);
+			measurement_temperature(&NPA700B);
+			send(&NPA700B);				
+			NPA700B.update_data	= 0;		
+		}		
 		
   }
   /* USER CODE END 3 */
@@ -257,6 +286,49 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+void init_npa(NPA *npa) 
+{
+    memset(npa, 0, sizeof(NPA)); // обнулить все поля структуры
+
+    // Инициализировать переменные со статическими значениями
+    npa->pressure_min = -5.0f; // pressure corresponding to output value 0 dec
+    npa->pressure_max = 5.0f;  // pressure corresponding to output value 16383 dec
+    npa->tcoeff = 2048.0f;     // 2^11 see datasheet 
+    npa->count_max = 16380;
+    npa->count_min = 16;
+
+    strcpy(npa->msg, "NPA initialized"); 
+}
+
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+        if(htim->Instance == TIM1) //check if the interrupt comes from TIM1
+        {
+					HAL_I2C_Mem_Read(&hi2c1, (0x28 << 1), 0, I2C_MEMADD_SIZE_8BIT, NPA700B.Data, 4, HAL_MAX_DELAY);	
+					NPA700B.update_data = 1;			
+        }
+}
+
+float measurement_pressure(NPA *npa)
+{
+	npa->pressure_raw = npa->Data[0] << 8 | npa->Data[1];		// High Byte, Left shift the high byte
+	npa->slope = (npa->count_max - npa->count_min) / (npa->pressure_max + fabs(npa->pressure_min)); 	
+	if (npa->pressure_raw < npa->count_max) return (npa->pressure_calc = (npa->pressure_raw / npa->slope) + npa->pressure_min);		
+	else return 0;
+}
+
+float measurement_temperature(NPA *npa)
+{
+	npa->temperature_raw = npa->Data[2] << 3 | npa->Data[3] >> 5; // High Byte, Left shift the high byte by 3 bits for the lower 3 bits 
+	// Right shift it by 5 bits to put the lower 3 bits it the correct bit slot
+	return (npa->temperature_calc = ((npa->temperature_raw*200.00)/npa->tcoeff) - 50.00);	
+}
+
+void send(NPA *npa)
+{
+	sprintf(npa->msg, "%.4f psi %.2f C\n\r", npa->pressure_calc, npa->temperature_calc);
+	CDC_Transmit_FS((uint8_t*)npa->msg, strlen(npa->msg));	
+}
 
 /* USER CODE END 4 */
 
